@@ -11,23 +11,23 @@ from albumentations.pytorch import ToTensorV2
 
 ROOT = os.path.join(os.getcwd(), 'Project')
 transform = A.Compose([
-    A.Resize(448, 448),
-    A.ShiftScaleRotate(rotate_limit=30, p=0.5),
-    A.HorizontalFlip(p=0.5),
-    A.RandomBrightnessContrast(p=0.5),
-    A.RandomGamma(p=0.2),
-    ToTensorV2(),
-],
-    bbox_params=A.BboxParams(format='yolo',
-                             min_visibility=0.3,
-                             label_fields=[],
-                             ),
+            A.Resize(448,448),
+            A.ShiftScaleRotate(rotate_limit=30,p=0.5),
+            A.HorizontalFlip(p=0.5),
+            A.RandomBrightnessContrast(p=0.5),
+            A.RandomGamma(p=0.2),
+            ],
+            bbox_params=A.BboxParams(format='yolo',
+                                     min_visibility=0.4,
+                                     label_fields=[],
+                                    ),
 )
+
 
 dataset = YOLODataset(root=ROOT,
                       transform=transform,
-                      train=True,
-                      )
+                     )
+
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=8,
                                          shuffle=True,
                                          )
@@ -39,7 +39,9 @@ for param in backbone.parameters():
 
 model = Yolopretrained_resnet(backbone)
 model = model.to(device)
-model = torch.load(f'{ROOT}/full_model_resnet_drone.pt')
+
+if os.path.exists(f'{ROOT}/full_model_resnet.pt'):
+    model = torch.load(f'{ROOT}/full_model_resnet.pt')
 
 loss_fn = YoloLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr=0.0001, momentum=0.9)
@@ -55,19 +57,20 @@ for epoch in range(50):
     for img, labels in tqdm(dataloader):
         images = img.permute(0, 3, 1, 2).to(device)
         out = model(images)
+        #         loss = loss_fn(out.to('cpu'),labels)
         class_loss, object_loss, box_loss, no_object_loss, loss = loss_fn(out, labels.to(device))
-        print(
-            f"Class Loss:{class_loss} Obj Loss:{object_loss} Box Loss:{box_loss} No Obj Loss:{no_object_loss} Loss:{loss}",
-        )
+        # print(f"Class Loss:{class_loss} Obj Loss:{object_loss} Box Loss:{box_loss} Loss:{loss}",
+        #       # end="\r",
+        #       )
 
         mean_loss.append(loss.detach().item())
         mean_classloss.append(class_loss.item())
         mean_boxloss.append(box_loss.item())
         mean_objloss.append(object_loss.item())
         mean_noobj_loss.append(no_object_loss.item())
+        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        optimizer.zero_grad()
 
     print(f"Epoch: {epoch + 1} \
     Class Loss:{sum(mean_classloss) / len(mean_classloss)} Object Loss:{sum(mean_objloss) / len(mean_objloss)} \
@@ -75,5 +78,5 @@ for epoch in range(50):
 
     print(f"\nMean loss was {sum(mean_loss) / len(mean_loss)}")
 
-torch.save(model.state_dict(), f'{ROOT}/model_dict_resnet_drone.pt')
-torch.save(model, f'{ROOT}/full_model_resnet_drone.pt')
+    if epoch % 5 == 0:
+        torch.save(model, f'{ROOT}/full_model_resnet_drone.pt')

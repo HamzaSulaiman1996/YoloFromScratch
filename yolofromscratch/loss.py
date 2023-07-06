@@ -23,11 +23,17 @@ class YoloLoss(nn.Module):
         iou_b1 = intersection_over_union(predictions[..., 2:6], target[..., 2:6])
         iou_b2 = intersection_over_union(predictions[..., 7:11], target[..., 2:6])
 
+        #         print(iou_b1,iou_b2)
+
+        #         print(iou_b1.shape,iou_b2.shape)
+        # #         print(iou_b1)
+
         ious = torch.cat([iou_b1.unsqueeze(0), iou_b2.unsqueeze(0)], dim=0)
 
         ioumax, bestbox_ind = torch.max(ious,
-                                        dim=0)  # bestbox_ind tells which box produced highest iou, ioumax tells the value of that iou
+                                        dim=0)  ##bestbox_ind tells which box produced highest iou, ioumax tells the value of that iou
         existobj = target[..., 1:2]
+        #         print(existobj,existobj.shape) #if object exisits
 
         box_predictions = existobj * (bestbox_ind * predictions[..., 7:11] + (1 - bestbox_ind) * predictions[..., 2:6])
 
@@ -39,6 +45,9 @@ class YoloLoss(nn.Module):
         )
 
         target_bbox[..., 2:4] = torch.sqrt(target_bbox[..., 2:4])
+
+        #         print(target_bbox.shape,target_bbox)
+        #         print(box_predictions,box_predictions.shape)
 
         box_loss = self.mse(
             torch.flatten(box_predictions, end_dim=-2),
